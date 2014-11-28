@@ -1,5 +1,7 @@
 import ss_tray
-import wx
+import wx.html
+import smtp_simulator_server as smtp_ss
+import server_test1 as test, time
 
 app_name = "SMTP Simulator"
 app_version = "0.1b1"
@@ -45,7 +47,7 @@ class EmailTablePanel(wx.Panel):
     def OnListLeftDown(self, event):
         x,y = event.GetPosition()
         row,flags = self.eml_table.HitTest( (x,y) )
-        print row
+        self.Parent.Parent.ED_panel.html_win.SetPage('<html><body><i>Email: '+str(row)+'</i></body></html>')
         self.eml_table.Select(row)
             
     def OnListRightDown(self, event):
@@ -55,8 +57,8 @@ class EmailDetailsPanel(wx.Panel):
     def __init__(self, parent):
         wx.Panel.__init__(self, parent)
         self.ed_bs1= wx.BoxSizer()
-        self.xmlE = wx.TextCtrl(self, id=wx.ID_ANY, style=wx.TE_MULTILINE|wx.BORDER_NONE|wx.EXPAND|wx.TE_DONTWRAP|wx.TE_RICH2)
-        self.ed_bs1.Add(self.xmlE, proportion=1, flag=wx.CENTER|wx.EXPAND)
+        self.html_win = wx.html.HtmlWindow(self)
+        self.ed_bs1.Add(self.html_win, proportion=1, flag=wx.CENTER|wx.EXPAND)
         self.SetSizerAndFit(self.ed_bs1)
 
 class MainPanel(wx.Panel):
@@ -86,6 +88,8 @@ class MainFrame(wx.Frame):
         self.status_bar.SetFieldsCount(2)
         self.status_bar.SetStatusWidths([80,-1])
         self.tbIcon = ss_tray.TrayIcon(self)
+        
+        self.smtp_mgnr = None
  
         self.Bind(wx.EVT_ICONIZE, self.onMinimize)
         self.Bind(wx.EVT_CLOSE, self.onClose)
@@ -95,8 +99,8 @@ class MainFrame(wx.Frame):
         stopTool  = toolbar.AddLabelTool(wx.ID_ANY, 'Stop', wx.Bitmap('icons/computer_delete.png'), shortHelp='Stop Simulator')
         toolbar.Realize()
 
-        self.Bind(wx.EVT_TOOL, self.onClose, startTool)
-        self.Bind(wx.EVT_TOOL, self.onClose, stopTool)
+        self.Bind(wx.EVT_TOOL, self.startSMTPSS, startTool)
+        self.Bind(wx.EVT_TOOL, self.stopSMTPSS, stopTool)
         
         menuBar = wx.MenuBar()
 
@@ -117,14 +121,35 @@ class MainFrame(wx.Frame):
         
         self.Show()
  
-    def onClose(self, evt):
+    def startSMTPSS(self, event):
+        if self.smtp_mgnr!=None and self.smtp_mgnr.thread.isAlive():
+            print 'Already Started'
+            return
+        
+        self.smtp_mgnr = smtp_ss.ServerManager()
+        self.smtp_mgnr.start()
+
+    def stopSMTPSS(self, event):
+        if self.smtp_mgnr==None:
+            print 'Not Started'
+            return
+        
+        if not self.smtp_mgnr.thread.isAlive():    
+            print 'Not Running'
+            return
+            
+        self.smtp_mgnr.stop()
+        print 'After Stop'
+                
+    def onClose(self, event):
+        self.stopSMTPSS(event)
         self.tbIcon.RemoveIcon()
         self.tbIcon.Destroy()
         self.Destroy()
  
     def onMinimize(self, event):
         self.Hide()
- 
+
 def main():
     app = wx.App(False)
     frame = MainFrame()
@@ -132,3 +157,13 @@ def main():
  
 if __name__ == "__main__":
     main()
+    
+'''    
+server = test.MyReceiver()
+server.start()
+app = wx.App(False)
+frame = MainFrame()
+app.MainLoop()
+time.sleep(10)
+server.stop()
+'''    
